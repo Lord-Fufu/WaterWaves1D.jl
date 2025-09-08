@@ -1,0 +1,4 @@
+using StatsPlots, DataFrames
+df = DataFrame(A = 1:10, B =rand(10))
+plotd = @df df StatsPlots.plot(:A, :B);
+savefig(plotd,"file.png")

@@ -1,0 +1,77 @@
+
+path = "C:\\Users\\amoneyro\\.julia\\packages\\WaterWaves1D\\1xDqi\\test_Antoine\\"
+
+using WaterWaves1D
+using Plots
+
+###----------------COMPARISON DETERMINISTIC VS STOCHASTIC (1 TRAJECTORY)---------------###
+#=
+include(path * "WWtest.jl") #reference
+
+include(path * "compare-Airy-LUAiry.jl")    #Airy model
+include(path * "compare-B-LUB.jl")          #Boussinesq model
+include(path * "compare-B-LUB-WW.jl")
+include(path * "compare-SGN-LUSGN.jl")      #Serre-Green-Naghdi model
+include(path * "compare-SV-LUSV.jl")        #Saint-Venant model
+=#
+###-------------------------STATISTICS FOR LUSGN & LUB MODELS--------------------------###
+
+using Distributed
+
+@everywhere n_processors = 5 
+addprocs(n_processors)
+@everywhere using DistributedArrays
+
+n_sample=130                                                     #Number of samples. Best choosing a multiple of n_processors
+
+#include(path * "statistics\\compute-LUSV-particles.jl")         #Saint-Venant model
+#include(path * "statistics\\compute-LUB-particles.jl")          #Boussinesq model
+#include(path * "statistics\\compute-LUSGN-particles.jl")         #Serre-Green-Naghdi model
+
+include(path * "compareModelsStats-noParallelCompute.jl")
+include(path * "compareModelsStats-noParallelStats.jl")
+
+
+
+using Plots
+
+T_plot = 5
+index_to_plot = Int(round(T_plot/param.T*param.Ns))
+
+etaToPlot_plus, velocityToPlot_plus, meshToPlot_plus = avgPlus3Std.model.mapfro(avgPlus3Std.data.U[index_to_plot])
+etaToPlot_minus, velocityToPlot_minus, meshToPlot_minus = avgMinus3Std.model.mapfro(avgMinus3Std.data.U[index_to_plot])
+
+#=plot([B_problem, convLUB_problem, WW_problem], T=5, labels = ["Boussinesq" "LU Boussinesq" "Water Waves"],
+xlabel = "Horizontal domain (x)", ylabel = "Surface elevation (η)",
+titlefontsize=14,
+guidefontsize=14,
+tickfontsize=10,
+legendfontsize=10,
+xlim = (-20,20),
+ylim = (-0.4,1.0))=#
+
+plot(meshToPlot_plus, (etaToPlot_minus .+ etaToPlot_plus)/2, ribbon = (etaToPlot_plus .- etaToPlot_minus)/2, T=5,
+            fillalpha = 0.5, c=:orange, label = "3 STD Spread", legend = :topright,
+            xlabel = "Horizontal domain (x)", ylabel = "Surface elevation (η)",
+            titlefontsize=14,
+            guidefontsize=14,
+            tickfontsize=10,
+            legendfontsize=10,
+            xlim = (-20,20),
+            ylim = (-0.4,1.0));
+
+plot!(avg_pbm, xlims=(-20,20), T=T_plot, c=:red, label = "Average LU-SGN");
+plot!(WW_problem, xlims=(-20,20), T=T_plot, c=:green, alpha = 0.5, label = "Water Waves")
+plot!(SGN_problem, xlims=(-20,20), T=T_plot, c=:blue, alpha = 0.5, label = "SGN",
+        xlabel = "Horizontal domain (x)", ylabel = "Surface elevation (η)")
+
+savefig(".//Documents//__plot Julia//plotsForPaper//LUSGN-statistics.pdf")
+
+
+n_show = 500
+anim = @animate for t in LinRange(0,paramWW.T,n_show)
+    plot([avgPlus3Std, avgMinus3Std, WW_problem], xlims=(-30,30), ylims=(-0.5,1), T=t)
+end
+
+gif(anim, ".//Documents//__plot Julia//stat-LUSGN-Fourier.gif", fps=30)     #Serre-Green-Naghdi save
+#gif(anim, ".//Documents//__plot Julia//stat-LUB.gif", fps=30)      #Boussinesq save
